@@ -11,6 +11,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestSlogHandler_WithAttrs(t *testing.T) {
+	onTest1 := &CoralogixHandler{
+		Next: slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}),
+	}
+	assert.Empty(t, onTest1.defaultData)
+
+	onTest2 := onTest1.WithAttrs([]slog.Attr{
+		slog.String("1", "1"),
+		slog.Int("2", 2),
+	})
+
+	assert.Equal(t, map[string]interface{}{
+		"1": "1",
+		"2": int64(2),
+	}, onTest2.(*CoralogixHandler).defaultData)
+}
+
 func TestSlogHandler_Send(t *testing.T) {
 	coralogixHandler := NewCoralogixHandler(
 		GetEnv(

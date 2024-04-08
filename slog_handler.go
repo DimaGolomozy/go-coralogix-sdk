@@ -12,6 +12,8 @@ type CoralogixHandler struct {
 	// cxLogger is the Coralogix logger.
 	cxLogger  *CoralogixLogger
 	AddSource bool
+
+	defaultData map[string]interface{}
 }
 
 type source struct {
@@ -22,7 +24,6 @@ type source struct {
 
 type logMessage struct {
 	Message string         `json:"message"`
-	Level   string         `json:"level"`
 	Data    map[string]any `json:"data,omitempty"`
 	Source  source         `json:"source,omitempty"`
 }
@@ -40,6 +41,15 @@ func NewCoralogixHandler(privateKey, applicationName, subsystemName string, next
 	}
 }
 
+func (h *CoralogixHandler) cloneData() map[string]interface{} {
+	clone := map[string]interface{}{}
+	for k, v := range h.defaultData {
+		clone[k] = v
+	}
+
+	return clone
+}
+
 // Handle handles the provided log record.
 func (h *CoralogixHandler) Handle(ctx context.Context, r slog.Record) error {
 	fs := runtime.CallersFrames([]uintptr{r.PC})
@@ -47,8 +57,7 @@ func (h *CoralogixHandler) Handle(ctx context.Context, r slog.Record) error {
 
 	log := logMessage{
 		Message: r.Message,
-		Level:   r.Level.String(),
-		Data:    map[string]interface{}{},
+		Data:    h.cloneData(),
 	}
 
 	if h.AddSource {
@@ -66,17 +75,42 @@ func (h *CoralogixHandler) Handle(ctx context.Context, r slog.Record) error {
 		})
 	}
 
-	h.cxLogger.Log(levelSlogToCoralogix(r.Level), log, "", "", f.Function, "")
+	category := ""
+	if v, ok := log.Data["Category"]; ok {
+		category = v.(string)
+		delete(log.Data, "Category")
+	}
+
+	className := ""
+	if v, ok := log.Data["ClassName"]; ok {
+		className = v.(string)
+		delete(log.Data, "ClassName")
+	}
+
+	threadId := ""
+	if v, ok := log.Data["ThreadId"]; ok {
+		threadId = v.(string)
+		delete(log.Data, "ThreadId")
+	}
+
+	h.cxLogger.Log(levelSlogToCoralogix(r.Level), log, category, className, f.Function, threadId)
 
 	return h.Next.Handle(ctx, r)
 }
 
 // WithAttrs returns a new Coralogix whose attributes consists of handler's attributes followed by attrs.
 func (h *CoralogixHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	data := h.cloneData()
+	for _, attr := range attrs {
+		attrToMap(data, attr)
+	}
+
 	return &CoralogixHandler{
 		Next:      h.Next.WithAttrs(attrs),
 		cxLogger:  h.cxLogger,
 		AddSource: h.AddSource,
+
+		defaultData: data,
 	}
 }
 
