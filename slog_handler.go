@@ -7,12 +7,9 @@ import (
 )
 
 type CoralogixHandler struct {
-	// Next represents the next handler in the chain.
-	Next slog.Handler
-	// cxLogger is the Coralogix logger.
-	cxLogger  *CoralogixLogger
-	AddSource bool
+	cxLogger *CoralogixLogger
 
+	opts        slog.HandlerOptions
 	defaultData map[string]interface{}
 }
 
@@ -28,7 +25,7 @@ type logMessage struct {
 	Source  source         `json:"source,omitempty"`
 }
 
-func NewCoralogixHandler(privateKey, applicationName, subsystemName string, next slog.Handler) *CoralogixHandler {
+func NewCoralogixHandler(privateKey, applicationName, subsystemName string, opts *slog.HandlerOptions) *CoralogixHandler {
 	logger := NewCoralogixLogger(
 		privateKey,
 		applicationName,
@@ -36,8 +33,8 @@ func NewCoralogixHandler(privateKey, applicationName, subsystemName string, next
 	)
 
 	return &CoralogixHandler{
-		Next:     next,
 		cxLogger: logger,
+		opts:     *opts,
 	}
 }
 
@@ -60,7 +57,7 @@ func (h *CoralogixHandler) Handle(ctx context.Context, r slog.Record) error {
 		Data:    h.cloneData(),
 	}
 
-	if h.AddSource {
+	if h.opts.AddSource {
 		log.Source = source{
 			Function: f.Function,
 			File:     f.File,
@@ -94,8 +91,7 @@ func (h *CoralogixHandler) Handle(ctx context.Context, r slog.Record) error {
 	}
 
 	h.cxLogger.Log(levelSlogToCoralogix(r.Level), log, category, className, f.Function, threadId)
-
-	return h.Next.Handle(ctx, r)
+	return nil
 }
 
 // WithAttrs returns a new Coralogix whose attributes consists of handler's attributes followed by attrs.
@@ -106,9 +102,8 @@ func (h *CoralogixHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 
 	return &CoralogixHandler{
-		Next:      h.Next.WithAttrs(attrs),
-		cxLogger:  h.cxLogger,
-		AddSource: h.AddSource,
+		cxLogger: h.cxLogger,
+		opts:     h.opts,
 
 		defaultData: data,
 	}
@@ -116,17 +111,18 @@ func (h *CoralogixHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 
 // WithGroup returns a new Coralogix with a group, provided the group's name.
 func (h *CoralogixHandler) WithGroup(name string) slog.Handler {
-	return &CoralogixHandler{
-		Next:      h.Next.WithGroup(name),
-		cxLogger:  h.cxLogger,
-		AddSource: h.AddSource,
-	}
+	// not supported yet
+	return h
 }
 
 // Enabled reports whether the logger emits log records at the given context and level.
 // Note: We handover the decision down to the next handler.
 func (h *CoralogixHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return h.Next.Enabled(ctx, level)
+	minLevel := slog.LevelInfo
+	if h.opts.Level != nil {
+		minLevel = h.opts.Level.Level()
+	}
+	return level >= minLevel
 }
 
 func (h *CoralogixHandler) Stop() {
