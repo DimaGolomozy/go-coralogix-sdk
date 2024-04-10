@@ -13,4 +13,3 @@
 
 This package provides logging suites integrated with `Coralogix` logs analytics platform.
 For watch how to use it, please, read [Coralogix Go SDK Docs](https://godoc.org/github.com/coralogix/go-coralogix-sdk).
-
