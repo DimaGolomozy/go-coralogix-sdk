@@ -3,7 +3,6 @@ package coralogix
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -12,11 +11,7 @@ import (
 )
 
 func TestSlogHandler_WithAttrs(t *testing.T) {
-	onTest1 := &CoralogixHandler{
-		Next: slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		}),
-	}
+	onTest1 := &CoralogixHandler{}
 	assert.Empty(t, onTest1.defaultData)
 
 	onTest2 := onTest1.WithAttrs([]slog.Attr{
@@ -71,9 +66,7 @@ func TestSlogHandler_Send(t *testing.T) {
 		),
 		"sdk-go",
 		"test",
-		slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		}),
+		&slog.HandlerOptions{},
 	)
 	defer func() { recover() }()
 	defer coralogixHandler.Stop()
