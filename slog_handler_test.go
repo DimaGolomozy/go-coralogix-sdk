@@ -66,7 +66,9 @@ func TestSlogHandler_Send(t *testing.T) {
 		),
 		"sdk-go",
 		"test",
-		&slog.HandlerOptions{},
+		&slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
 	)
 	defer func() { recover() }()
 	defer coralogixHandler.Stop()
@@ -115,7 +117,7 @@ func TestSlogHandler_Send(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := fmt.Sprintf("%s (%s)", tc.name, t.Name())
 			tc.logfn(msg, attr)
-			time.Sleep(time.Duration(1) * time.Second)
+			time.Sleep(1 * time.Second)
 			bulk, ok := mockHTTPServerMap[t.Name()]
 			assert.True(t, ok, "%s key not found in mockHTTPServerMap", t.Name())
 
