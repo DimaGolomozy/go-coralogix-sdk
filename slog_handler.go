@@ -131,8 +131,6 @@ func (h *CoralogixHandler) Stop() {
 
 func attrToMap(m map[string]any, a slog.Attr) {
 	switch v := a.Value.Any().(type) {
-	case error:
-		m[a.Key] = v.Error()
 	case []slog.Attr:
 		m2 := map[string]any{}
 		for _, a2 := range v {
@@ -140,7 +138,7 @@ func attrToMap(m map[string]any, a slog.Attr) {
 			m[a.Key] = m2
 		}
 	default:
-		m[a.Key] = a.Value.Any()
+		m[a.Key] = v
 	}
 }
 
