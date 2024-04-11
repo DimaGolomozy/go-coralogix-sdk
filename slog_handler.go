@@ -9,8 +9,9 @@ import (
 type CoralogixHandler struct {
 	cxLogger *CoralogixLogger
 
-	opts        slog.HandlerOptions
-	defaultData map[string]interface{}
+	opts   slog.HandlerOptions
+	data   map[string]interface{}
+	groups []string
 }
 
 type source struct {
@@ -40,8 +41,17 @@ func NewCoralogixHandler(privateKey, applicationName, subsystemName string, opts
 
 func (h *CoralogixHandler) cloneData() map[string]interface{} {
 	clone := map[string]interface{}{}
-	for k, v := range h.defaultData {
+	for k, v := range h.data {
 		clone[k] = v
+	}
+
+	return clone
+}
+
+func (h *CoralogixHandler) cloneGroups() []string {
+	clone := make([]string, len(h.groups))
+	for i, group := range h.groups {
+		clone[i] = group
 	}
 
 	return clone
@@ -57,19 +67,20 @@ func (h *CoralogixHandler) Handle(ctx context.Context, r slog.Record) error {
 		Data:    h.cloneData(),
 	}
 
+	grouped := groupToMap(log.Data, h.groups)
+	if r.NumAttrs() > 0 {
+		r.Attrs(func(a slog.Attr) bool {
+			attrToMap(grouped, a)
+			return true
+		})
+	}
+
 	if h.opts.AddSource {
 		log.Source = source{
 			Function: f.Function,
 			File:     f.File,
 			Line:     f.Line,
 		}
-	}
-
-	if r.NumAttrs() > 0 {
-		r.Attrs(func(a slog.Attr) bool {
-			attrToMap(log.Data, a)
-			return true
-		})
 	}
 
 	category := ""
@@ -97,22 +108,29 @@ func (h *CoralogixHandler) Handle(ctx context.Context, r slog.Record) error {
 // WithAttrs returns a new Coralogix whose attributes consists of handler's attributes followed by attrs.
 func (h *CoralogixHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	data := h.cloneData()
+	grouped := groupToMap(data, h.groups)
 	for _, attr := range attrs {
-		attrToMap(data, attr)
+		attrToMap(grouped, attr)
 	}
 
 	return &CoralogixHandler{
 		cxLogger: h.cxLogger,
 		opts:     h.opts,
 
-		defaultData: data,
+		data:   data,
+		groups: h.cloneGroups(),
 	}
 }
 
 // WithGroup returns a new Coralogix with a group, provided the group's name.
 func (h *CoralogixHandler) WithGroup(name string) slog.Handler {
-	// not supported yet
-	return h
+	return &CoralogixHandler{
+		cxLogger: h.cxLogger,
+		opts:     h.opts,
+
+		data:   h.cloneData(),
+		groups: append(h.cloneGroups(), name),
+	}
 }
 
 // Enabled reports whether the logger emits log records at the given context and level.
@@ -140,6 +158,16 @@ func attrToMap(m map[string]any, a slog.Attr) {
 	default:
 		m[a.Key] = v
 	}
+}
+
+func groupToMap(m map[string]any, groups []string) map[string]any {
+	for _, group := range groups {
+		if _, ok := m[group]; !ok {
+			m[group] = map[string]any{}
+		}
+		m = m[group].(map[string]any)
+	}
+	return m
 }
 
 func levelSlogToCoralogix(level slog.Level) uint {

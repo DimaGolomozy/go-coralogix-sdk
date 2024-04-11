@@ -12,7 +12,7 @@ import (
 
 func TestSlogHandler_WithAttrs(t *testing.T) {
 	onTest1 := &CoralogixHandler{}
-	assert.Empty(t, onTest1.defaultData)
+	assert.Empty(t, onTest1.data)
 
 	onTest2 := onTest1.WithAttrs([]slog.Attr{
 		slog.String("1", "1"),
@@ -22,7 +22,7 @@ func TestSlogHandler_WithAttrs(t *testing.T) {
 	assert.Equal(t, map[string]interface{}{
 		"1": "1",
 		"2": int64(2),
-	}, onTest2.(*CoralogixHandler).defaultData)
+	}, onTest2.(*CoralogixHandler).data)
 }
 
 func TestSlogHandler_AttrToMap(t *testing.T) {
