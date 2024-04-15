@@ -23,7 +23,7 @@ type source struct {
 type logMessage struct {
 	Message string         `json:"message"`
 	Data    map[string]any `json:"data,omitempty"`
-	Source  source         `json:"source,omitempty"`
+	Source  *source        `json:"source,omitempty"`
 }
 
 func NewCoralogixHandler(privateKey, applicationName, subsystemName string, opts *slog.HandlerOptions) *CoralogixHandler {
@@ -76,7 +76,7 @@ func (h *CoralogixHandler) Handle(ctx context.Context, r slog.Record) error {
 	}
 
 	if h.opts.AddSource {
-		log.Source = source{
+		log.Source = &source{
 			Function: f.Function,
 			File:     f.File,
 			Line:     f.Line,
